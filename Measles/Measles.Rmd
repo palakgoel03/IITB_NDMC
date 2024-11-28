@@ -1,0 +1,385 @@
+---
+title: "Cases Per Million for (0-9) month age-group (adjusted for age-wise population)."
+author: "NDMC IIT Bombay"
+date: "2024-11-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# **Aim: To calculate the percentage of cases per million adjusted for age-wise population for a specific state**
+
+# **Key Points**: 
+
+1. Before running the code, make sure that the raw data CSV files (with the names "MR combined line list 2017 and 2018", "MR combined line list from 2019 to 2022", and "MR combined line list 2023 and 2024") are located in the same folder as the R script you're executing. This ensures that the code can access the files correctly when needed.
+
+2. Next, set the folder (where both the data files and the code are saved) as the working directory in R. This will ensure that R can access the files and execute the code correctly from that location. 
+
+3. The code reads the CSV files provided for the years 2017-2019, 2019-2022, and 2023-2024.
+
+4. To obtain the results for a specific state, you need to specify the state's name in capital letters (e.g., "BIHAR").
+
+5. This code generates a CSV file for the specified state, along with a trend line plot for the percentage of cases per million in the age group [0-9) months. Both the CSV file and the plot will be saved in the same folder as the code on your system.
+
+
+
+```{r echo=FALSE, include=FALSE}
+library(readxl)
+library(magrittr)
+library(purrr)
+library(dplyr)
+library(lubridate)
+library(writexl)
+library(ggplot2)
+library(scales)
+```
+
+##Data Loading and data preparation.
+```{r warning=FALSE}
+#Loading the excel sheet for different years
+df_17<- read_excel("MR combined line list 2017 and 2018.xlsx", sheet='2017')
+df_18<- read_excel("MR combined line list 2017 and 2018.xlsx", sheet='2018')
+
+df_19 <- read_excel("MR combined line list from 2019 to 2022.xlsx", sheet='2019')
+df_20 <- read_excel("MR combined line list from 2019 to 2022.xlsx", sheet='2020')
+df_21 <- read_excel("MR combined line list from 2019 to 2022.xlsx", sheet='2021')
+df_22 <- read_excel("MR combined line list from 2019 to 2022.xlsx", sheet='2022')
+
+df_23 <- read_excel("MR combined line list 2023 and 2024.xlsx", sheet='2023')
+df_24 <- read_excel("MR combined line list 2023 and 2024.xlsx", sheet='2024')
+
+#Extracting the data for a particular state from each data frame
+#Change the name of the state here in the variable state_name and plot1 as well as plot2.
+
+state_name = "MAHARASHTRA" #"TAMIL NADU"  #"GUJARAT" #"WEST BENGAL" #"MAHARASHTRA"#"BIHAR" #"UTTAR PRADESH"
+
+plot1="plot_EL_LC_MAHARASHTRA.png"
+plot2="plot_total_MAHARASHTRA.png"
+
+title1=state_name
+title2=state_name
+  
+Extract_State <- function(df) {
+  df  = subset(df, State_Name == state_name )
+}
+
+
+df_17 <- Extract_State(df_17)
+df_18 <- Extract_State(df_18)
+df_19 <- Extract_State(df_19)
+df_20 <- Extract_State(df_20)
+df_21 <- Extract_State(df_21)
+df_22 <- Extract_State(df_22)
+df_23 <- Extract_State(df_23)
+df_24 <- Extract_State(df_24)
+
+
+
+
+#Renaming the column name "Date of birth" to "DOB" for the years 2017-2021 for the state
+colnames(df_17)[colnames(df_17) == 'DOB'] <- 'Date of birth'
+colnames(df_18)[colnames(df_18) == 'DOB'] <- 'Date of birth'
+colnames(df_19)[colnames(df_19) == 'DOB'] <- 'Date of birth'
+colnames(df_20)[colnames(df_20) == 'DOB'] <- 'Date of birth'
+colnames(df_21)[colnames(df_21) == 'DOB'] <- 'Date of birth'
+
+
+
+#Re-coding the Case classification from the year 2017-2021 for UP, Maharashtra, Gujarat, 
+
+Recode_case_class<- function(df) {
+  df  = df %>%
+    mutate(`Case Classification` = recode(`Case Classification`,
+                                          `CLINICALLY COMPATIBLE` = "CLINICALLY COMPATIBLE MEASLES",
+                                          `EPIMEASLES` = "EPI LINKED MEASLES",
+                                          `MEASLES` = "LAB CONFIRMED MEASLES"))
+}
+
+df_17 <- Recode_case_class(df_17)
+df_18 <- Recode_case_class(df_18)
+df_19 <- Recode_case_class(df_19)
+df_20 <- Recode_case_class(df_20)
+df_21 <- Recode_case_class(df_21)
+
+
+
+# Dropping NAs from the following columns: "DOB", "Date of Onset of Rash", "Case Classification" 
+Drop_NAs<- function(df) {
+  df  = df %>%
+    filter(!is.na(`Date of birth`) & 
+             !is.na(`Date of Onset of Rash`) & 
+             !is.na(`Case Classification`))
+}
+
+
+df_17 <- Drop_NAs(df_17)
+df_18 <- Drop_NAs(df_18)
+df_19 <- Drop_NAs(df_19)
+df_20 <- Drop_NAs(df_20)
+df_21 <- Drop_NAs(df_21)
+df_22 <- Drop_NAs(df_22)
+df_23 <- Drop_NAs(df_23)
+df_24 <- Drop_NAs(df_24)
+
+
+columns_to_keep <- c("Date of birth", "Date of Onset of Rash", "Case Classification")
+
+
+Case_Class_Col<- function(df) {
+  df  = df %>%
+    filter(`Case Classification` %in% c("CLINICALLY COMPATIBLE MEASLES", 
+                                        "EPI LINKED MEASLES", 
+                                        "LAB CONFIRMED MEASLES")) %>%
+    select(all_of(columns_to_keep))
+}
+
+df_17 <- Case_Class_Col(df_17)
+df_18 <- Case_Class_Col(df_18)
+df_19 <- Case_Class_Col(df_19)
+df_20 <- Case_Class_Col(df_20)
+df_21 <- Case_Class_Col(df_21)
+df_22 <- Case_Class_Col(df_22)
+df_23 <- Case_Class_Col(df_23)
+df_24 <- Case_Class_Col(df_24)
+
+
+add_age_columns <- function(df) {
+  df %>%
+    mutate(
+      Calculated_Age = floor(as.numeric(difftime(`Date of Onset of Rash`, `Date of birth`, units = "days")) / 30.44)  # Using average number of days per month
+    )
+}
+
+
+df_17 <- add_age_columns(df_17)
+df_18 <- add_age_columns(df_18)
+df_19 <- add_age_columns(df_19)
+df_20 <- add_age_columns(df_20)
+df_21 <- add_age_columns(df_21)
+df_22 <- add_age_columns(df_22)
+df_23 <- add_age_columns(df_23)
+df_24 <- add_age_columns(df_24)
+
+
+# Creating Age Categories for counts: 
+
+categorize_age <- function(df) {
+  df %>%
+    mutate(Age_category = case_when(
+      Calculated_Age >= 0 & Calculated_Age <= 3 ~ "0-3 months",
+      Calculated_Age > 3 & Calculated_Age <= 6 ~ "(3-6] months",
+      Calculated_Age > 6 & Calculated_Age < 9 ~ "(6-9) months",
+      Calculated_Age >= 9 & Calculated_Age <= 12 ~ "[9-12] months",
+      Calculated_Age > 12 & Calculated_Age <= 24 ~ "(1-2] years",
+      Calculated_Age > 24 & Calculated_Age <= 36 ~ "(2-3] years",
+      Calculated_Age > 36 & Calculated_Age <= 48 ~ "(3-4] years",
+      Calculated_Age > 48 & Calculated_Age <= 60 ~ "(4-5] years",
+      Calculated_Age > 60 & Calculated_Age <= 120 ~ "(5-10] years",
+      Calculated_Age > 120 & Calculated_Age <= 180 ~ "(10-15] years",
+      Calculated_Age > 180 ~ "15+ years",
+      TRUE ~ NA_character_  # Default case for NA or unexpected values
+    ))
+}
+
+# Apply the function to each data frame
+
+df_17 <- categorize_age(df_17)
+df_18 <- categorize_age(df_18)
+df_19 <- categorize_age(df_19)
+df_20 <- categorize_age(df_20)
+df_21 <- categorize_age(df_21)
+df_22 <- categorize_age(df_22)
+df_23 <- categorize_age(df_23)
+df_24 <- categorize_age(df_24)
+
+
+
+# Count of cases by Case Classification 
+create_summary_table_distinct <- function(df, df_name, df_year) {
+  df=df %>%
+    group_by(`Case Classification`, Age_category) %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    mutate(StateName = df_name)  # Add the data frame name for identification
+  df <- df %>% mutate(Year = df_year)
+  custom_order <- c("0-3 months",  "(3-6] months", "(6-9) months", "[9-12] months", "(1-2] years", "(2-3] years", "(3-4] years", "(4-5] years", "(5-10] years", "(10-15] years", "15+ years" )
+  
+  # Convert Age_category to a factor with the custom order
+  df$Age_category <- factor(df$Age_category, levels = custom_order)
+  
+  # Sort the data frame based on the custom order
+  df <- df %>% arrange(Age_category)
+  return(df)
+}
+
+# Create summary tables for each data frame
+
+df_17 <- create_summary_table_distinct(df_17, state_name, 2017)
+df_18 <- create_summary_table_distinct(df_18, state_name, 2018)
+df_19 <- create_summary_table_distinct(df_19, state_name, 2019)
+df_20 <- create_summary_table_distinct(df_20, state_name, 2020)
+df_21 <- create_summary_table_distinct(df_21, state_name, 2021)
+df_22 <- create_summary_table_distinct(df_22, state_name, 2022)
+df_23 <- create_summary_table_distinct(df_23, state_name, 2023)
+df_24 <- create_summary_table_distinct(df_24, state_name, 2024)
+
+
+```
+
+
+##Loading the total population data for the state in order to perform further calculations.
+```{r echo=TRUE}
+Tot_Pop<- read_excel("Total_Population.xlsx", sheet=state_name)
+colnames(Tot_Pop)[colnames(Tot_Pop) == "Population"] <- "Age_category"
+colnames(Tot_Pop)[colnames(Tot_Pop) == state_name] <- "Population"
+```
+
+##Calculating the percentage of cases per million with respect to the case classification EPI Linked and Lab confirmed
+
+```{r echo=TRUE}
+
+totalcases_EL_LC <- function(df, df_state, df_year){
+  
+  
+  age_categories_filter <- c("0-3 months",  "(3-6] months", "(6-9) months", "[9-12] months", "(1-2] years", "(2-3] years", "(3-4] years", "(4-5] years", "(5-10] years", "(10-15] years", "15+ years" )
+  case_classification = c( "EPI LINKED MEASLES", "LAB CONFIRMED MEASLES")
+  df=subset(df, Age_category  %in%  age_categories_filter & `Case Classification` %in% case_classification)
+  
+  # Filter and aggregate the data
+  df <- df %>%
+    group_by(Age_category) %>%    # Group by age category and case classification
+    summarise(Total_Value = sum(Count), .groups = 'drop') # Summarize the data
+  
+  
+  #Adding total population for a particula state w.r.t. age startification
+  df <- merge(df, Tot_Pop, by = "Age_category")
+  
+  #Calculating the proportion
+  df$Cases_Per_Population <- df$Total_Value/df$Population
+  
+  #Calculating cases per million
+  df$Cases_Per_Million <- df$Cases_Per_Population*1000000
+  
+  #Calculating the pecentage of cases per million adjusted for age-wise population
+  df$Cases_Percent <- df$Cases_Per_Million/sum(df$Cases_Per_Million)*100
+  
+  df=df%>%mutate(state=df_state)
+  df=df%>%mutate(year=df_year)
+  
+  #print(sum(df$Cases_Percent))
+  
+  #Arranging the data in increasing order with respect to the age category
+  custom_order <- c("0-3 months",  "(3-6] months", "(6-9) months", "[9-12] months", "(1-2] years", "(2-3]                         years", "(3-4] years", "(4-5] years", "(5-10] years", "(10-15] years", "15+ years" )
+  
+  # Convert Age_category to a factor with the custom order
+  df$Age_category <- factor(df$Age_category, levels = custom_order)
+  
+  # Sort the data frame based on the custom order
+  df <- df %>% arrange(Age_category)
+  
+
+  
+  return(df)
+  
+}
+
+df_17_tot_EL_LC <- totalcases_EL_LC(df_17, state_name,2017)
+df_18_tot_EL_LC <-totalcases_EL_LC(df_18,state_name, 2018)
+df_19_tot_EL_LC <- totalcases_EL_LC(df_19,state_name, 2019)
+df_20_tot_EL_LC <-totalcases_EL_LC(df_20, state_name,2020)
+df_21_tot_EL_LC <- totalcases_EL_LC(df_21,state_name, 2021)
+df_22_tot_EL_LC <- totalcases_EL_LC(df_22, state_name,2022)
+df_23_tot_EL_LC <-totalcases_EL_LC(df_23,state_name, 2023)
+df_24_tot_EL_LC <-totalcases_EL_LC(df_24, state_name,2024)
+
+#Joining the data to save it into the excel file
+df_total_EL_LC <- bind_rows(df_17_tot_EL_LC,df_18_tot_EL_LC, df_19_tot_EL_LC, df_20_tot_EL_LC, df_21_tot_EL_LC, df_22_tot_EL_LC, df_23_tot_EL_LC, df_24_tot_EL_LC)
+
+# Write the data frames to an Excel file with specified tab names
+file_name="Maharashtra.xlsx"
+write_xlsx(df_total_EL_LC, path = file_name)
+
+```
+
+##Calculating the percentage of cases per million for age group 0-9 months. 
+
+```{r echo=TRUE}
+tot_0_9_EL_LC <- function(df){
+  
+ age_categories_filter <- c("0-3 months",  "(3-6] months", "(6-9) months")
+ # Filter and aggregate the data
+ df <- df %>%
+   filter(Age_category %in% age_categories_filter) %>% # Filter specific age categories
+   group_by(Age_category) %>%    # Group by age category and case classification
+   summarise(Total_Percent_09 = sum(Cases_Percent), .groups = 'drop') # Summarize the data
+
+ xx=sum(df$Total_Percent_09)
+ return(xx)
+}
+ 
+df_17_0_9_EL_LC <- round(tot_0_9_EL_LC(df_17_tot_EL_LC))
+df_18_0_9_EL_LC <- round(tot_0_9_EL_LC(df_18_tot_EL_LC))
+df_19_0_9_EL_LC <- round(tot_0_9_EL_LC(df_19_tot_EL_LC))
+df_20_0_9_EL_LC <- round(tot_0_9_EL_LC(df_20_tot_EL_LC))
+df_21_0_9_EL_LC <- round(tot_0_9_EL_LC(df_21_tot_EL_LC))
+df_22_0_9_EL_LC <- round(tot_0_9_EL_LC(df_22_tot_EL_LC))
+df_23_0_9_EL_LC <- round(tot_0_9_EL_LC(df_23_tot_EL_LC))
+df_24_0_9_EL_LC <- round(tot_0_9_EL_LC(df_24_tot_EL_LC))
+
+```
+
+##To plot the data mergeing the above calculated percentage into single data frame.
+
+```{r echo=TRUE}
+
+df_EL_LC=rbind.data.frame(df_17_0_9_EL_LC, df_18_0_9_EL_LC, df_19_0_9_EL_LC, df_20_0_9_EL_LC, df_21_0_9_EL_LC, df_22_0_9_EL_LC, df_23_0_9_EL_LC, df_24_0_9_EL_LC )
+colnames(df_EL_LC)[1] <- "Total_Cases_0_9_EL_LC"
+df_EL_LC$Year1=c("2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024")
+df_EL_LC$Year1 <- as.numeric(df_EL_LC$Year1)
+colnames(df_EL_LC)[2] <- "Year_1"
+```
+
+##Trend Line plot for the age group 0-9 months and case classification - EPI Linked and Lab confirmed.
+
+```{r echo=TRUE}
+
+#Create the line plot
+plot <- ggplot(df_EL_LC, aes(x = Year_1, y = Total_Cases_0_9_EL_LC)) +
+  geom_line(size = 1, color = "blue") +
+  geom_point(size = 2, color = "red") +
+  labs(
+    title = title1,
+    x = "Year",
+    y = "Percentage of Measles Cases in (0-9) Months"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.x = element_text(size = 7.5, hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(size = 7.5, hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(size = 7.5, face = "bold", color = "black"),
+    axis.text.y = element_text(size = 7.5, face = "bold", color = "black"),
+    plot.title = element_text(size = 8, hjust = 0.5, face = "bold")
+  ) +
+  geom_hline(yintercept = 10, linetype = "dashed", color = "green", size = 1) +  # Horizontal line at 10%
+  geom_hline(yintercept = 5, linetype = "solid", color = "black", size = 0.5) +  # Horizontal line at 5%
+  geom_vline(xintercept = 2017, linetype = "solid", color = "black", size = 0.5) + # Vertical line at 2017
+  scale_x_continuous(
+    breaks = seq(min(df_EL_LC$Year_1), max(df_EL_LC$Year_1), by = 1)) +  # Show all years on x-axis
+  scale_y_continuous(breaks = seq(0, max(df_EL_LC$Total_Cases_0_9_EL_LC)+20, by = 10), labels = function(x) paste0(x, "%")) +  # Add percent symbol to y-axis labels
+  # Add text labels for each point
+  geom_text(
+    aes(
+      label = paste0(Total_Cases_0_9_EL_LC, "%")
+    ),
+    vjust = -1,  # Adjust position of the text above the point
+    size = 1.7,
+    color = "black",
+    fontface = "bold"
+  )
+
+# Display the plot
+print(plot)
+
+# Save the plot to the current working directory
+ggsave(plot1, plot = plot, width = 8.08, height = 7, units="cm", dpi = 300, bg = "white")
+```
